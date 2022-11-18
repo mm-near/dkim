@@ -9,14 +9,14 @@ const RSA_KEY_TYPE: &str = "rsa";
 const ED25519_KEY_TYPE: &str = "ed25519";
 
 // https://datatracker.ietf.org/doc/html/rfc6376#section-6.1.2
-pub(crate) async fn retrieve_public_key(
+pub(crate) fn retrieve_public_key(
     logger: &slog::Logger,
     resolver: Arc<dyn dns::Lookup>,
     domain: String,
     subdomain: String,
 ) -> Result<DkimPublicKey, DKIMError> {
     let dns_name = format!("{}.{}.{}", subdomain, DNS_NAMESPACE, domain);
-    let res = resolver.lookup_txt(&dns_name).await?;
+    let res = resolver.lookup_txt(&dns_name)?;
     // TODO: Return multiple keys for when verifiying the signatures. During key
     // rotation they are often multiple keys to consider.
     let txt = res.first().ok_or(DKIMError::NoKeyForSignature)?;

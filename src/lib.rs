@@ -7,7 +7,6 @@ use rsa::RsaPublicKey;
 use slog::debug;
 use std::collections::HashSet;
 use std::sync::Arc;
-use trust_dns_resolver::TokioAsyncResolver;
 
 use mailparse::MailHeaderMap;
 
@@ -158,7 +157,7 @@ fn verify_signature(
     })
 }
 
-async fn verify_email_header<'a>(
+fn verify_email_header<'a>(
     logger: &'a slog::Logger,
     resolver: Arc<dyn dns::Lookup>,
     dkim_header: &'a DKIMHeader,
@@ -169,8 +168,7 @@ async fn verify_email_header<'a>(
         Arc::clone(&resolver),
         dkim_header.get_required_tag("d"),
         dkim_header.get_required_tag("s"),
-    )
-    .await?;
+    )?;
 
     let (header_canonicalization_type, body_canonicalization_type) =
         parser::parse_canonicalization(dkim_header.get_tag("c"))?;
@@ -207,7 +205,7 @@ async fn verify_email_header<'a>(
 }
 
 /// Run the DKIM verification on the email providing an existing resolver
-pub async fn verify_email_with_resolver<'a>(
+pub fn verify_email_with_resolver<'a>(
     logger: &slog::Logger,
     from_domain: &str,
     email: &'a mailparse::ParsedMail<'a>,
@@ -234,7 +232,7 @@ pub async fn verify_email_with_resolver<'a>(
             continue;
         }
 
-        match verify_email_header(logger, Arc::clone(&resolver), &dkim_header, email).await {
+        match verify_email_header(logger, Arc::clone(&resolver), &dkim_header, email) {
             Ok((header_canonicalization_type, body_canonicalization_type)) => {
                 return Ok(DKIMResult::pass(
                     signing_domain,
@@ -258,18 +256,15 @@ pub async fn verify_email_with_resolver<'a>(
 }
 
 /// Run the DKIM verification on the email
-pub async fn verify_email<'a>(
+/*pub async fn verify_email<'a>(
     logger: &slog::Logger,
     from_domain: &str,
     email: &'a mailparse::ParsedMail<'a>,
 ) -> Result<DKIMResult, DKIMError> {
-    let resolver = TokioAsyncResolver::tokio_from_system_conf().map_err(|err| {
-        DKIMError::UnknownInternalError(format!("failed to create DNS resolver: {}", err))
-    })?;
-    let resolver = dns::from_tokio_resolver(resolver);
+//    let resolver = dns::from_tokio_resolver(resolver);
 
     verify_email_with_resolver(logger, from_domain, email, resolver).await
-}
+}*/
 
 #[cfg(test)]
 mod tests {
