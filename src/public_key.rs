@@ -1,9 +1,8 @@
 use rsa::{pkcs1, pkcs8};
 use slog::{debug, warn};
 use std::collections::HashMap;
-use std::sync::Arc;
 
-use crate::{dns, parser, DKIMError, DkimPublicKey, DNS_NAMESPACE};
+use crate::{parser, DKIMError, DkimPublicKey, DNS_NAMESPACE};
 
 const RSA_KEY_TYPE: &str = "rsa";
 const ED25519_KEY_TYPE: &str = "ed25519";
@@ -11,15 +10,15 @@ const ED25519_KEY_TYPE: &str = "ed25519";
 // https://datatracker.ietf.org/doc/html/rfc6376#section-6.1.2
 pub(crate) fn retrieve_public_key(
     logger: &slog::Logger,
-    resolver: Arc<dyn dns::Lookup>,
+    resolver: &HashMap<String, String>,
     domain: String,
     subdomain: String,
 ) -> Result<DkimPublicKey, DKIMError> {
     let dns_name = format!("{}.{}.{}", subdomain, DNS_NAMESPACE, domain);
-    let res = resolver.lookup_txt(&dns_name)?;
+    let txt = resolver.get(&dns_name).ok_or(DKIMError::NoKeyForSignature)?;
     // TODO: Return multiple keys for when verifiying the signatures. During key
     // rotation they are often multiple keys to consider.
-    let txt = res.first().ok_or(DKIMError::NoKeyForSignature)?;
+    //let txt = res.first().ok_or()?;
     debug!(logger, "DKIM TXT: {:?}", txt);
 
     // Parse the tags inside the DKIM TXT DNS record

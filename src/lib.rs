@@ -5,8 +5,8 @@ use rsa::PublicKey;
 use rsa::RsaPrivateKey;
 use rsa::RsaPublicKey;
 use slog::debug;
+use std::collections::HashMap;
 use std::collections::HashSet;
-use std::sync::Arc;
 
 use mailparse::MailHeaderMap;
 
@@ -159,13 +159,13 @@ fn verify_signature(
 
 fn verify_email_header<'a>(
     logger: &'a slog::Logger,
-    resolver: Arc<dyn dns::Lookup>,
+    resolver: &HashMap<String, String>,
     dkim_header: &'a DKIMHeader,
     email: &'a mailparse::ParsedMail<'a>,
 ) -> Result<(canonicalization::Type, canonicalization::Type), DKIMError> {
     let public_key = public_key::retrieve_public_key(
         logger,
-        Arc::clone(&resolver),
+        resolver,
         dkim_header.get_required_tag("d"),
         dkim_header.get_required_tag("s"),
     )?;
@@ -207,9 +207,8 @@ fn verify_email_header<'a>(
 /// Run the DKIM verification on the email providing an existing resolver
 pub fn verify_email_with_resolver<'a>(
     logger: &slog::Logger,
-    from_domain: &str,
     email: &'a mailparse::ParsedMail<'a>,
-    resolver: Arc<dyn dns::Lookup>,
+    resolver: &HashMap<String, String>,
 ) -> Result<DKIMResult, DKIMError> {
     let mut last_error = None;
 
@@ -226,16 +225,10 @@ pub fn verify_email_with_resolver<'a>(
             }
         };
 
-        // Select the signature corresponding to the email sender
-        let signing_domain = dkim_header.get_required_tag("d");
-        if signing_domain.to_lowercase() != from_domain.to_lowercase() {
-            continue;
-        }
-
-        match verify_email_header(logger, Arc::clone(&resolver), &dkim_header, email) {
+        match verify_email_header(logger, resolver, &dkim_header, email) {
             Ok((header_canonicalization_type, body_canonicalization_type)) => {
                 return Ok(DKIMResult::pass(
-                    signing_domain,
+                    "".to_owned(),
                     header_canonicalization_type,
                     body_canonicalization_type,
                 ))
@@ -249,22 +242,11 @@ pub fn verify_email_with_resolver<'a>(
     }
 
     if let Some(err) = last_error {
-        Ok(DKIMResult::fail(err, from_domain.to_owned()))
+        Ok(DKIMResult::fail(err, "".to_owned()))
     } else {
-        Ok(DKIMResult::neutral(from_domain.to_owned()))
+        Ok(DKIMResult::neutral("".to_owned()))
     }
 }
-
-/// Run the DKIM verification on the email
-/*pub async fn verify_email<'a>(
-    logger: &slog::Logger,
-    from_domain: &str,
-    email: &'a mailparse::ParsedMail<'a>,
-) -> Result<DKIMResult, DKIMError> {
-//    let resolver = dns::from_tokio_resolver(resolver);
-
-    verify_email_with_resolver(logger, from_domain, email, resolver).await
-}*/
 
 #[cfg(test)]
 mod tests {
